@@ -7,9 +7,10 @@ import java.text.DecimalFormat;
 import java.util.Map.Entry;
 
 import org.apache.hadoop.io.DoubleWritable;
-import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.SortedMapWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
 
 /**
  * @author Robin
@@ -17,13 +18,13 @@ import org.apache.hadoop.io.Writable;
  */
 public class Tools {
 
-	public static Text mapWritableToText(MapWritable map) {
+	public static Text mapWritableToText(SortedMapWritable map) {
 		StringBuilder sb = new StringBuilder();
 		sb.append("{");
 		int i = 0;
 		Writable value;
 		String valueStr;
-		for (Entry<Writable, Writable> entry : map.entrySet()) {
+		for (Entry<WritableComparable, Writable> entry : map.entrySet()) {
 			value = entry.getValue();
 			if (value instanceof DoubleWritable)
 				valueStr = formatDouble(((DoubleWritable) value).get());

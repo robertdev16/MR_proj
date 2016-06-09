@@ -30,7 +30,7 @@ public class StripText extends Text {
 		String text1 = this.toString();
 		String text2 = text.toString();
 
-		LOG.info("comparing " + text1 + " with " + text2);
+		LOG.debug("comparing " + text1 + " with " + text2);
 
 		if (isNumber(text1) && isNumber(text2)) {
 			int val1 = Integer.parseInt(text1);

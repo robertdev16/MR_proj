@@ -11,9 +11,10 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.MapWritable;
+import org.apache.hadoop.io.SortedMapWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Partitioner;
@@ -29,7 +30,7 @@ import org.apache.log4j.Logger;
 public class Stripes extends Configured implements Tool {
 
 	public static class MapClass extends
-			Mapper<Text, Text, StripText, MapWritable> {
+			Mapper<Text, Text, StripText, SortedMapWritable> {
 		private static final Logger LOG = Logger.getLogger(MapClass.class);
 		private IntWritable one = new IntWritable(1);
 
@@ -43,89 +44,107 @@ public class Stripes extends Configured implements Tool {
 				if (listTerm != null) {
 					for (int i = 0; i < listTerm.length - 1; i++) {
 						String currentTerm = listTerm[i];
-						MapWritable stripes = new MapWritable();
+						SortedMapWritable stripes = new SortedMapWritable();
 						for (int j = i + 1; j < listTerm.length; j++) {
 							if (currentTerm.equals(listTerm[j]))
 								break;
-							Text curNeighbor = new Text(listTerm[j]);
-							if (stripes.containsKey(curNeighbor)) {
-								int counter = ((IntWritable) stripes
-										.get(curNeighbor)).get();
-								counter++;
-								stripes.put(curNeighbor, new IntWritable(
-										counter));
-							} else {
-								stripes.put(curNeighbor, one);
-							}
+							StripText curNeighbor = new StripText(listTerm[j]);
+							saveDataForStripes(stripes, curNeighbor);
 						}
+
 						LOG.debug("<Term, stripes> = (" + currentTerm + ", "
 								+ Tools.mapWritableToText(stripes) + ")");
+
 						context.write(new StripText(currentTerm), stripes);
+
+						LOG.debug("Ending mapping");
 					}
 				}
 			}
 
+		}
+
+		private void saveDataForStripes(SortedMapWritable stripes,
+				Text curNeighbor) {
+			if (stripes.containsKey(curNeighbor)) {
+				int counter = ((IntWritable) stripes.get(curNeighbor)).get();
+				counter++;
+				stripes.put(curNeighbor, new IntWritable(counter));
+			} else {
+				stripes.put(curNeighbor, one);
+			}
 		}
 
 	}
 
 	public static class ReduceClass extends
-			Reducer<Text, MapWritable, Text, Text> {
+			Reducer<Text, SortedMapWritable, Text, Text> {
 		private static final Logger LOG = Logger.getLogger(ReduceClass.class);
 
 		@Override
-		public void reduce(Text term, Iterable<MapWritable> stripesList,
+		public void reduce(Text term, Iterable<SortedMapWritable> stripesList,
 				Context context) throws IOException, InterruptedException {
-			MapWritable listTermNeighbor = new MapWritable();
-			Iterator<MapWritable> listStripes = stripesList.iterator();
+			LOG.debug("Starting reducing");
+			SortedMapWritable listTermNeighbor = new SortedMapWritable();
+			Iterator<SortedMapWritable> listStripes = stripesList.iterator();
 			double stripeTotal = 0.0;
 			while (listStripes.hasNext()) {
-				MapWritable stripe = listStripes.next();
+				SortedMapWritable stripe = listStripes.next();
 
-				for (Entry<Writable, Writable> entry : stripe.entrySet()) {
-					Text curNeighbor = (Text) entry.getKey();
-					if (listTermNeighbor.containsKey(curNeighbor)) {
-						int val1 = ((IntWritable) entry.getValue()).get();
-						double val2 = ((DoubleWritable) listTermNeighbor
-								.get(curNeighbor)).get();
-						stripeTotal += val1;
-						double val = val1 + val2;
-						listTermNeighbor.put(curNeighbor, new DoubleWritable(
-								val));
-					} else {
-						int curVal = ((IntWritable) entry.getValue()).get();
-						listTermNeighbor.put(curNeighbor, new DoubleWritable(
-								curVal));
-						stripeTotal += curVal;
-					}
-				}
+				stripeTotal = countStripeTotalAndCurVal(listTermNeighbor,
+						stripeTotal, stripe);
 			}
 
-			for (Entry<Writable, Writable> entry : listTermNeighbor.entrySet()) {
+			for (Entry<WritableComparable, Writable> entry : listTermNeighbor
+					.entrySet()) {
 				double curVal = ((DoubleWritable) entry.getValue()).get();
 				double frequencies = curVal / stripeTotal;
-				LOG.debug("CurVal/StripeTotal = " + curVal + "/" + stripeTotal
-						+ " => Frequency = " + frequencies);
+
 				frequencies = Double.parseDouble(Tools
 						.formatDouble(frequencies));
 				entry.setValue(new DoubleWritable(frequencies));
 			}
 
-			LOG.debug("<Term, listTerm> = (" + term + ", "
+			LOG.debug("<Term, listStripes> = (" + term + ", "
 					+ Tools.mapWritableToText(listTermNeighbor) + ")");
+
 			context.write(term, Tools.mapWritableToText(listTermNeighbor));
+
+			LOG.debug("Ending reducing");
+		}
+
+		private double countStripeTotalAndCurVal(
+				SortedMapWritable listTermNeighbor, double stripeTotal,
+				SortedMapWritable stripe) {
+			for (Entry<WritableComparable, Writable> entry : stripe.entrySet()) {
+				Text curNeighbor = (Text) entry.getKey();
+				if (listTermNeighbor.containsKey(curNeighbor)) {
+					int val1 = ((IntWritable) entry.getValue()).get();
+					double val2 = ((DoubleWritable) listTermNeighbor
+							.get(curNeighbor)).get();
+					stripeTotal += val1;
+					double val = val1 + val2;
+					listTermNeighbor.put(curNeighbor, new DoubleWritable(val));
+				} else {
+					int curVal = ((IntWritable) entry.getValue()).get();
+					listTermNeighbor.put(curNeighbor,
+							new DoubleWritable(curVal));
+					stripeTotal += curVal;
+				}
+			}
+			return stripeTotal;
 		}
 	}
 
 	public static class PartitionerClass extends
-			Partitioner<StripText, MapWritable> {
+			Partitioner<StripText, SortedMapWritable> {
 		private static final Logger LOG = Logger
 				.getLogger(PartitionerClass.class);
 
 		@Override
-		public int getPartition(StripText key, MapWritable value,
+		public int getPartition(StripText key, SortedMapWritable value,
 				int numPartitions) {
-			LOG.debug("you are the " + key.toString());
+			LOG.debug("Starting getPartition");
 			int keyInt = Integer.parseInt(key.toString());
 
 			return keyInt % numPartitions;
@@ -151,7 +170,7 @@ public class Stripes extends Configured implements Tool {
 
 		job.setMapperClass(MapClass.class);
 		job.setMapOutputKeyClass(StripText.class);
-		job.setMapOutputValueClass(MapWritable.class);
+		job.setMapOutputValueClass(SortedMapWritable.class);
 		job.setNumReduceTasks(2);
 		job.setPartitionerClass(PartitionerClass.class);
 		job.setOutputKeyClass(Text.class);
