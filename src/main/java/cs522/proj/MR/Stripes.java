@@ -11,6 +11,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.MapWritable;
 import org.apache.hadoop.io.SortedMapWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -30,21 +31,20 @@ import org.apache.log4j.Logger;
 public class Stripes extends Configured implements Tool {
 
 	public static class MapClass extends
-			Mapper<Text, Text, StripText, SortedMapWritable> {
-		private static final Logger LOG = Logger.getLogger(MapClass.class);
+			Mapper<Text, Text, StripText, MapWritable> {
+
 		private IntWritable one = new IntWritable(1);
 
 		@Override
 		public void map(Text key, Text value, Context context)
 				throws IOException, InterruptedException {
 
-			LOG.debug("Starting mapping");
 			if (value != null) {
 				String[] listTerm = value.toString().split("\\s+");
 				if (listTerm != null) {
 					for (int i = 0; i < listTerm.length - 1; i++) {
 						String currentTerm = listTerm[i];
-						SortedMapWritable stripes = new SortedMapWritable();
+						MapWritable stripes = new MapWritable();
 						for (int j = i + 1; j < listTerm.length; j++) {
 							if (currentTerm.equals(listTerm[j]))
 								break;
@@ -52,20 +52,15 @@ public class Stripes extends Configured implements Tool {
 							saveDataForStripes(stripes, curNeighbor);
 						}
 
-						LOG.debug("<Term, stripes> = (" + currentTerm + ", "
-								+ Tools.mapWritableToText(stripes) + ")");
-
 						context.write(new StripText(currentTerm), stripes);
 
-						LOG.debug("Ending mapping");
 					}
 				}
 			}
 
 		}
 
-		private void saveDataForStripes(SortedMapWritable stripes,
-				Text curNeighbor) {
+		private void saveDataForStripes(MapWritable stripes, Text curNeighbor) {
 			if (stripes.containsKey(curNeighbor)) {
 				int counter = ((IntWritable) stripes.get(curNeighbor)).get();
 				counter++;
@@ -78,18 +73,18 @@ public class Stripes extends Configured implements Tool {
 	}
 
 	public static class ReduceClass extends
-			Reducer<Text, SortedMapWritable, Text, Text> {
+			Reducer<Text, MapWritable, Text, Text> {
 		private static final Logger LOG = Logger.getLogger(ReduceClass.class);
 
 		@Override
-		public void reduce(Text term, Iterable<SortedMapWritable> stripesList,
+		public void reduce(Text term, Iterable<MapWritable> stripesList,
 				Context context) throws IOException, InterruptedException {
 			LOG.debug("Starting reducing");
 			SortedMapWritable listTermNeighbor = new SortedMapWritable();
-			Iterator<SortedMapWritable> listStripes = stripesList.iterator();
+			Iterator<MapWritable> listStripes = stripesList.iterator();
 			double stripeTotal = 0.0;
 			while (listStripes.hasNext()) {
-				SortedMapWritable stripe = listStripes.next();
+				MapWritable stripe = listStripes.next();
 
 				stripeTotal = countStripeTotalAndCurVal(listTermNeighbor,
 						stripeTotal, stripe);
@@ -115,8 +110,8 @@ public class Stripes extends Configured implements Tool {
 
 		private double countStripeTotalAndCurVal(
 				SortedMapWritable listTermNeighbor, double stripeTotal,
-				SortedMapWritable stripe) {
-			for (Entry<WritableComparable, Writable> entry : stripe.entrySet()) {
+				MapWritable stripe) {
+			for (Entry<Writable, Writable> entry : stripe.entrySet()) {
 				Text curNeighbor = (Text) entry.getKey();
 				if (listTermNeighbor.containsKey(curNeighbor)) {
 					int val1 = ((IntWritable) entry.getValue()).get();
@@ -137,12 +132,12 @@ public class Stripes extends Configured implements Tool {
 	}
 
 	public static class PartitionerClass extends
-			Partitioner<StripText, SortedMapWritable> {
+			Partitioner<StripText, MapWritable> {
 		private static final Logger LOG = Logger
 				.getLogger(PartitionerClass.class);
 
 		@Override
-		public int getPartition(StripText key, SortedMapWritable value,
+		public int getPartition(StripText key, MapWritable value,
 				int numPartitions) {
 			LOG.debug("Starting getPartition");
 			int keyInt = Integer.parseInt(key.toString());
@@ -170,7 +165,7 @@ public class Stripes extends Configured implements Tool {
 
 		job.setMapperClass(MapClass.class);
 		job.setMapOutputKeyClass(StripText.class);
-		job.setMapOutputValueClass(SortedMapWritable.class);
+		job.setMapOutputValueClass(MapWritable.class);
 		job.setNumReduceTasks(2);
 		job.setPartitionerClass(PartitionerClass.class);
 		job.setOutputKeyClass(Text.class);
