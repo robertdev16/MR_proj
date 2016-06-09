@@ -1,3 +1,5 @@
 /target/
 /MRproj.log
 /pom.xml
+/.classpath
+/.settings/
