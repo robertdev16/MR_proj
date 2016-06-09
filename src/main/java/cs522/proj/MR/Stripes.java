@@ -37,7 +37,7 @@ public class Stripes extends Configured implements Tool {
 		public void map(Text key, Text value, Context context)
 				throws IOException, InterruptedException {
 
-			LOG.info("Starting mapping");
+			LOG.debug("Starting mapping");
 			if (value != null) {
 				String[] listTerm = value.toString().split("\\s+");
 				if (listTerm != null) {
@@ -58,7 +58,7 @@ public class Stripes extends Configured implements Tool {
 								stripes.put(curNeighbor, one);
 							}
 						}
-						LOG.info("<Term, stripes> = (" + currentTerm + ", "
+						LOG.debug("<Term, stripes> = (" + currentTerm + ", "
 								+ Tools.mapWritableToText(stripes) + ")");
 						context.write(new StripText(currentTerm), stripes);
 					}
@@ -104,14 +104,14 @@ public class Stripes extends Configured implements Tool {
 			for (Entry<Writable, Writable> entry : listTermNeighbor.entrySet()) {
 				double curVal = ((DoubleWritable) entry.getValue()).get();
 				double frequencies = curVal / stripeTotal;
-				LOG.info("CurVal/StripeTotal = " + curVal + "/" + stripeTotal
+				LOG.debug("CurVal/StripeTotal = " + curVal + "/" + stripeTotal
 						+ " => Frequency = " + frequencies);
 				frequencies = Double.parseDouble(Tools
 						.formatDouble(frequencies));
 				entry.setValue(new DoubleWritable(frequencies));
 			}
 
-			LOG.info("<Term, listTerm> = (" + term + ", "
+			LOG.debug("<Term, listTerm> = (" + term + ", "
 					+ Tools.mapWritableToText(listTermNeighbor) + ")");
 			context.write(term, Tools.mapWritableToText(listTermNeighbor));
 		}
@@ -125,7 +125,7 @@ public class Stripes extends Configured implements Tool {
 		@Override
 		public int getPartition(StripText key, MapWritable value,
 				int numPartitions) {
-			LOG.info("you are the " + key.toString());
+			LOG.debug("you are the " + key.toString());
 			int keyInt = Integer.parseInt(key.toString());
 
 			return keyInt % numPartitions;
@@ -168,5 +168,4 @@ public class Stripes extends Configured implements Tool {
 		int ret = ToolRunner.run(new Stripes(), args);
 		System.exit(ret);
 	}
-
 }

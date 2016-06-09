@@ -21,12 +21,19 @@ public class Tools {
 		StringBuilder sb = new StringBuilder();
 		sb.append("{");
 		int i = 0;
+		Writable value;
+		String valueStr;
 		for (Entry<Writable, Writable> entry : map.entrySet()) {
+			value = entry.getValue();
+			if (value instanceof DoubleWritable)
+				valueStr = formatDouble(((DoubleWritable) value).get());
+			else
+				valueStr = value.toString();
 			i++;
 			sb.append("(");
 			sb.append(entry.getKey());
 			sb.append(", ");
-			sb.append(entry.getValue());
+			sb.append(valueStr);
 			sb.append(")");
 			if (i != map.size())
 				sb.append(", ");
