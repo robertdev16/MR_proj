@@ -54,9 +54,9 @@ public class Hourly2Monthly extends Configured implements Tool {
 			
 			int count = 0;
 			int sum = 0;
-			int i, pos, FahrInt;
+			int pos, FahrInt;
 			String FahrStr;
-			for (i=0; i<24; i++) {
+			for (int i=0; i<24; i++) {
 				pos = 18 + 7 * i;
 				FahrStr = valueStr.substring(pos, pos + 5);
 				if ((FahrStr.trim().isEmpty()) || (FahrStr.charAt(0) == '-'))
