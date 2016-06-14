@@ -29,6 +29,9 @@ public class YearlyGoldenRatio extends Configured implements Tool {
 	private static final Logger logger = Logger.getLogger(YearlyGoldenRatio.class);
 	private static final String columnFamily = "tavg";
 	private static final String[] qualifiers = {"yearly", "diffGR"};
+	private static final float tBodyInCelsius = 37.0f;
+	private static final float goldenRatio = 0.618f;
+	private static final float tGRInFahrenheit = (tBodyInCelsius * goldenRatio) * 1.8f + 32.0f;
 
 	public YearlyGoldenRatio() {
 		super();
@@ -62,7 +65,7 @@ public class YearlyGoldenRatio extends Configured implements Tool {
 				}
 				count++;
 				yearlySum += monthlyFloat;
-				diffGRSum += Math.abs(monthlyFloat - 73.1588);				
+				diffGRSum += Math.abs(monthlyFloat - tGRInFahrenheit);				
 			}
 
 			if (count == 0){
